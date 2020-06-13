@@ -1,8 +1,26 @@
 """Object Detection Dataset
 
-This is a module for managing object detection dataset.
+    This is a module for managing object detection dataset.
+
+    @author : Muhammad Sakti Alvissalim (alvissalim@gmail.com)
+
+    Copyright (C) 2020  Muhammad Sakti Alvissalim 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
+
 import os
 from io import StringIO, BytesIO
 import base64
@@ -33,7 +51,7 @@ class BoundingBox(NamedTuple):
 class ObjectDetectionDataset(Dataset):
     """Pytorch dataset for loading LabelMe json annotation files."""
 
-    def __init__(self, dataset_root_path : str, target_image_size : Tuple[int,int], transform = None, **kwargs):
+    def __init__(self, dataset_root_path : str, target_image_size : Tuple[int,int], label_map : Dict[str, int], transform = None, **kwargs):
         """Construct a new dataset
 
         Args:
@@ -43,6 +61,8 @@ class ObjectDetectionDataset(Dataset):
         """
         super(ObjectDetectionDataset, self).__init__(**kwargs)
         self.target_image_size = target_image_size
+
+        self.label_map = label_map
         
         self.transform = transform
         # Find all json files
@@ -109,9 +129,13 @@ class ObjectDetectionDataset(Dataset):
                 bbox = BoundingBox(min_x=bbox[0],min_y=bbox[1],max_x=bbox[2], max_y=bbox[3])
                 # Add bounding box to list
                 bboxes.append(bbox)
-
+                try:
+                    label_id = self.label_map[s["label"]]
+                except:
+                    print("Invalid label : %s"%(s["label"]) )
+                    raise
                 # Add label to list of labels
-                labels.append(s["label"])
+                labels.append(label_id)
 
         # If no transform is given output the same        
         resized_bb = bboxes
@@ -143,19 +167,20 @@ def object_dataset_collate_fn(batch : List[Dict]) -> Dict:
     Returns:
         Dict: Batch of data
     """
+    images = [ s["image"] for s in batch]
 
-    if isinstance(batch["image"], np.ndarray):
-        colorImages = np.stack(batch["image"])
+    if isinstance(images[0], np.ndarray):
+        images = np.stack(images)
     
-    if isinstance(batch["image"], torch.FloatTensor):
-        colorImages = torch.stack(batch["image"])
+    if isinstance(images[0], torch.FloatTensor):
+        images = torch.stack(images)
 
     boundingBoxes = [ s["bboxes"] for s in batch ]
 
     labels = [ s["labels"] for s in batch ]
     
     res = {
-        "images" : colorImages,
+        "images" : images,
         "bboxes" : boundingBoxes,
         "labels" : labels
     }

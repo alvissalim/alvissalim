@@ -1,13 +1,37 @@
+"""Object Detection Tester Program
+
+    This is a module for testing object detection model.
+
+    @author : Muhammad Sakti Alvissalim (alvissalim@gmail.com)
+
+    Copyright (C) 2020  Muhammad Sakti Alvissalim 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+
 import cv2
 from ObjectDetectionModel import ObjectDetectionModel
 from ObjectDetectionDataset import BoundingBox
 import torch
 from torchvision.ops import nms
+from torchvision.transforms.functional import normalize, to_tensor
 from PIL import Image, ImageDraw
 import numpy as np
 
-CHECKPOINT_PATH = "checkpoints/300_1.9707084881762664.pth"
-INPUT_VIDEO_PATH = "input_vid_2.webm"
+CHECKPOINT_PATH = "checkpoints/06_13_2020_08_48_39/200_8.117394844690958.pth"
+INPUT_VIDEO_PATH = "face.mp4"
 OUTPUT_VIDEO_PATH = "output.avi"
 
 anchor_boxes = [    BoundingBox(min_x = -0.15, min_y = -0.15, max_x = 0.15, max_y = 0.15),
@@ -22,13 +46,21 @@ def load_model(check_point_path):
     return model
 
 def detect_face_in_frame(model, image):
-    image_tensor = torch.from_numpy(image).float() / 255.0 - 0.5
-    image_tensor = image_tensor.permute(2, 0, 1)
+    
+    image_mean = [0.485, 0.456, 0.406]
+    image_std = [0.229, 0.224, 0.225]
+
+    image_tensor = to_tensor(image)
+    image_tensor = normalize(image_tensor, mean=image_mean, std=image_std)
+    
+
+    #image_tensor = torch.from_numpy(image).float() / 255.0 - 0.5
+    #image_tensor = image_tensor.permute(2, 0, 1)
     image_tensor = image_tensor.unsqueeze(0)
 
     image = Image.fromarray(image)
 
-    image_tensor = image_tensor.to("cuda:0")
+    image_tensor = image_tensor.to("cpu:0")
 
     output = model(image_tensor)
 
@@ -38,7 +70,7 @@ def detect_face_in_frame(model, image):
 
     objectness_output = torch.sigmoid(bb_outputs[:,:,:,-1])
 
-    candidate_cell_index = torch.nonzero(objectness_output > 0.35).detach().cpu().numpy().tolist()
+    candidate_cell_index = torch.nonzero(objectness_output > 0.25).detach().cpu().numpy().tolist()
 
     bb_scores = []
     candidates_bb = []
@@ -89,12 +121,12 @@ def detect_face_in_frame(model, image):
 
 
 if __name__ == "__main__":
-    model = load_model(CHECKPOINT_PATH).to("cuda:0").eval()
+    model = load_model(CHECKPOINT_PATH).to("cpu:0").eval()
 
     # load video file
     vid = cv2.VideoCapture(INPUT_VIDEO_PATH)
 
-    out_vid = cv2.VideoWriter(OUTPUT_VIDEO_PATH, cv2.VideoWriter_fourcc('M','J','P','G'), 10, (512,512))
+    out_vid = cv2.VideoWriter(OUTPUT_VIDEO_PATH, cv2.VideoWriter_fourcc('M','J','P','G'), 10, (512,300))
 
     while(True):
         # Capture frame-by-frame
@@ -103,7 +135,17 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        frame = cv2.resize(frame, (512,512))
+        # get image height, width
+        (h, w) = frame.shape[:2]
+        # calculate the center of the image
+        center = (w / 2, h / 2) 
+
+        M = cv2.getRotationMatrix2D(center, 90, 1)
+        frame = cv2.warpAffine(frame, M, (w, h)) 
+
+        
+
+        frame = cv2.resize(frame, (512,300))
 
         frame = detect_face_in_frame(model, frame)
 

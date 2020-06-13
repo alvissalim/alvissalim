@@ -1,3 +1,23 @@
+"""Object Detection Model 
+    @author : Muhammad Sakti Alvissalim (alvissalim@gmail.com)
+
+    Copyright (C) 2020  Muhammad Sakti Alvissalim 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+
 import torch
 from torch import nn
 import torchvision.models as models
@@ -22,8 +42,6 @@ class ObjectDetectionModel(nn.Module):
         self.base_features = base_model.features
         
         self.final_feat = nn.Conv2d(base_model.last_channel, cell_tensor_size, 1, stride=1)
-        #self.fc1 = nn.Linear(self.features_length * 10 * 10, 4096)
-        #self.fc2 = nn.Linear(4096, cell_tensor_size * output_grid_size * output_grid_size)
 
     def forward(self, x):
         x = self.base_features(x)
@@ -31,8 +49,7 @@ class ObjectDetectionModel(nn.Module):
         x = nn.functional.adaptive_avg_pool2d(x, self.output_grid_size )#
         x = x.permute(0,2,3,1)
         x = x.flatten(start_dim=1)
-        #x = self.fc1(x)
-        #x = self.fc2(x)
+
         return x
 
 if __name__ == "__main__":
